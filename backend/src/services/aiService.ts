@@ -2,10 +2,10 @@ import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import OpenAI from 'openai';
 import type { CRMRecord, SkippedRecord, BatchResult } from '../types';
 
-const BATCH_SIZE = 10;       // Reduced token pressure
+const BATCH_SIZE = 25;        // Rows per AI call — larger = fewer API calls
 const MAX_RETRIES = 4;
 const BASE_RETRY_DELAY_MS = 3000;
-const INTER_BATCH_DELAY_MS = 2000; // Wait between batches
+const CONCURRENCY = 3;        // Max parallel AI calls at once
 
 const CRM_STATUS_VALUES = [
   'GOOD_LEAD_FOLLOW_UP',
@@ -47,8 +47,8 @@ const COUNTRY_CODE_CANDIDATES = [
 // The system will try these models in order. If OpenAI is missing a key or fails, 
 // it falls back to Gemini.
 const MODEL_CHAIN = [
-  { provider: 'gemini', model: 'gemini-2.5-pro' },
   { provider: 'gemini', model: 'gemini-2.5-flash' },
+  { provider: 'gemini', model: 'gemini-2.5-pro' },
   { provider: 'openai', model: 'gpt-4o-mini' },
   { provider: 'openai', model: 'gpt-4o' },
 ];
@@ -1243,32 +1243,47 @@ export async function extractCRMRecords(
     batches.push(rows.slice(i, i + BATCH_SIZE));
   }
 
-  console.log(`🤖 AI extraction: ${rows.length} rows → ${batches.length} batches of ${BATCH_SIZE}`);
-  console.log(`📋 Fallback chain:`, MODEL_CHAIN.map(c => `${c.provider}/${c.model}`).join(' → '));
+  console.log(` AI extraction: ${rows.length} rows → ${batches.length} batches of ${BATCH_SIZE}`);
+  console.log(` Fallback chain:`, MODEL_CHAIN.map(c => `${c.provider}/${c.model}`).join(' → '));
 
-  for (let i = 0; i < batches.length; i++) {
-    const batch = batches[i];
-    console.log(`\n📦 Processing batch ${i + 1}/${batches.length} (${batch.length} rows)`);
+  // Process batches in concurrent waves of size CONCURRENCY
+  let completedCount = 0;
+  for (let wave = 0; wave < batches.length; wave += CONCURRENCY) {
+    const waveSlice = batches.slice(wave, wave + CONCURRENCY);
+    const waveStartIndex = wave;
 
-    const result = await processBatchWithRetry(headers, batch, i);
+    console.log(`\n Wave ${Math.floor(wave / CONCURRENCY) + 1}: processing batches ${wave + 1}–${Math.min(wave + CONCURRENCY, batches.length)} of ${batches.length} concurrently`);
 
-    allRecords.push(...result.records);
+    const waveResults = await Promise.allSettled(
+      waveSlice.map((batch, localIdx) => {
+        const globalIdx = waveStartIndex + localIdx;
+        console.log(`  → Dispatching batch ${globalIdx + 1}/${batches.length} (${batch.length} rows)`);
+        return processBatchWithRetry(headers, batch, globalIdx);
+      })
+    );
 
-    const adjustedSkipped = result.skippedRecords.map((s) => ({
-      ...s,
-      row: i * BATCH_SIZE + s.row,
-    }));
-    allSkipped.push(...adjustedSkipped);
+    for (let localIdx = 0; localIdx < waveResults.length; localIdx++) {
+      const globalIdx = waveStartIndex + localIdx;
+      const outcome = waveResults[localIdx];
 
-    await onBatchComplete?.(i + 1, batches.length);
+      if (outcome.status === 'fulfilled') {
+        const result = outcome.value;
+        allRecords.push(...result.records);
+        const adjustedSkipped = result.skippedRecords.map((s) => ({
+          ...s,
+          row: globalIdx * BATCH_SIZE + s.row,
+        }));
+        allSkipped.push(...adjustedSkipped);
+      } else {
+        console.error(`  ✗ Batch ${globalIdx + 1} ultimately failed:`, outcome.reason);
+      }
 
-    if (i < batches.length - 1) {
-      console.log(`  ⏳ Inter-batch delay ${INTER_BATCH_DELAY_MS}ms...`);
-      await sleep(INTER_BATCH_DELAY_MS);
+      completedCount++;
+      await onBatchComplete?.(completedCount, batches.length);
     }
   }
 
-  console.log(`\n✅ Extraction complete: ${allRecords.length} records, ${allSkipped.length} skipped`);
+  console.log(`\n Extraction complete: ${allRecords.length} records, ${allSkipped.length} skipped`);
 
   return { records: allRecords, skippedRecords: allSkipped };
 }

@@ -41,7 +41,7 @@ export default function UploadZone({ onFileSelected, isLoading }: UploadZoneProp
   return (
     <div className="upload-page">
       {/* Heading */}
-      <div className="upload-heading fade-up">
+      <div className="upload-heading fade-up mt-10">
         <h1>Import any CSV into GrowEasy CRM</h1>
         <p>
           Upload any CSV file — our AI intelligently maps your columns to CRM fields,

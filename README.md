@@ -93,6 +93,22 @@ npm run dev
 ```
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+### 4. Running with Docker (Alternative)
+
+If you prefer to containerize the application, you can use Docker Compose to automatically spin up MongoDB, the Express Backend, and the Next.js Frontend.
+
+1. Ensure [Docker](https://docs.docker.com/get-docker/) is installed and running.
+2. Create a `.env` file in the **root** directory (next to `docker-compose.yml`) to pass your API key to the containers:
+   ```env
+   GEMINI_API_KEY=your_gemini_key_here
+   ```
+   *(Note: The other necessary environment variables are already pre-configured in the `docker-compose.yml` file).*
+3. Run the following command from the root directory:
+   ```bash
+   docker-compose up --build
+   ```
+4. Once the containers are built and running, open [http://localhost:3000](http://localhost:3000) in your browser.
+
 ## Design Decisions & Trade-offs
 
 - **Polling vs. WebSockets**: Given the batch processing nature, polling via a custom `useImportPolling` hook (1s interval) was chosen for architectural simplicity over managing WebSocket connections. It easily handles momentary disconnects gracefully.

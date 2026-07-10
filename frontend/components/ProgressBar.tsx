@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ZapIcon, CheckIcon } from './Icons';
+import { ZapIcon, CheckIcon, LoaderIcon } from './Icons';
 
 interface ProgressBarProps {
   batchesDone: number;
@@ -14,12 +14,6 @@ interface ProgressBarProps {
 export default function ProgressBar({ batchesDone, totalBatches, filename, totalRows, onCancel }: ProgressBarProps) {
   const pct = totalBatches > 0 ? Math.round((batchesDone / totalBatches) * 100) : 0;
   const estimated = Math.min(Math.round((batchesDone / Math.max(totalBatches, 1)) * totalRows), totalRows);
-
-  const steps = [
-    { label: 'File parsed', done: true },
-    { label: 'AI mapping', done: batchesDone > 0 },
-    { label: 'Saving records', done: pct === 100 },
-  ];
 
   return (
     <div className="progress-page fade-up">
@@ -60,12 +54,9 @@ export default function ProgressBar({ batchesDone, totalBatches, filename, total
       </div>
 
       <div className="progress-steps">
-        {steps.map(({ label, done }) => (
-          <div key={label} className={`progress-step-pill ${done ? 'done' : 'pending'}`}>
-            {done && <CheckIcon size={11} />}
-            {label}
-          </div>
-        ))}
+        <div className="progress-step-pill active">
+          Processing<span className="dots"></span>
+        </div>
       </div>
 
       {onCancel && (

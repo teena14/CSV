@@ -80,14 +80,7 @@ export default function ResultsTable({ result, filename, onReset }: ResultsTable
 
   return (
     <div className="fade-up">
-      {/* Success banner */}
-      <div className="results-banner">
-        <CheckIcon size={15} />
-        <span>
-          Import complete —{' '}
-          <strong>{successCount.toLocaleString()} records</strong> mapped to GrowEasy CRM format
-        </span>
-      </div>
+
 
       {/* Stats */}
       <div className="stats-row fade-up-1">
