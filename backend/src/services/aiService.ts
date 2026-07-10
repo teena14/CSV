@@ -64,7 +64,16 @@ function getGeminiModel(modelName: string): GenerativeModel {
     geminiClient = new GoogleGenerativeAI(apiKey);
   }
   if (!geminiModels.has(modelName)) {
-    geminiModels.set(modelName, geminiClient.getGenerativeModel({ model: modelName }));
+    geminiModels.set(
+      modelName,
+      geminiClient.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          temperature: 0.2,
+          topP: 1,
+        } as any,
+      })
+    );
   }
   return geminiModels.get(modelName)!;
 }
@@ -87,7 +96,8 @@ async function generateWithProvider(provider: string, modelName: string, prompt:
     const response = await client.chat.completions.create({
       model: modelName,
       messages: [{ role: 'user', content: prompt }],
-      temperature: 0.1,
+      temperature: 0.2,
+      top_p: 1,
       response_format: { type: 'json_object' }
     });
     return response.choices[0].message.content || '';
